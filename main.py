@@ -57,19 +57,19 @@ st.markdown(
     .card-content {
         display: flex;
         flex-direction: column;
-        align-items: center.
+        align-items: center;
     }
     .card-content .label {
         font-size: 1.2em;
-        font-weight: bold.
+        font-weight: bold;
     }
     .card-content .description {
-        font-size: 0.9em.
-        font-family: Arial, sans-serif.
+        font-size: 0.9em;
+        font-family: Arial, sans-serif;
     }
     .css-1d391kg .stSelectbox [data-baseweb="select"] {
-        background-color: #3E7B27.
-        color: #EFE3C2.
+        background-color: #3E7B27;
+        color: #EFE3C2;
     }
     </style>
     """,
@@ -128,7 +128,8 @@ def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None
     with tf.GradientTape() as tape:
         last_conv_layer_output, preds = grad_model(img_array)
         if pred_index is None:
-            pred_index = tf.argmax(preds[0])
+            # Force conversion to Python int to prevent TypeError slice errors in newer Keras versions
+            pred_index = int(tf.argmax(preds[0]))
         class_channel = preds[:, pred_index]
 
     grads = tape.gradient(class_channel, last_conv_layer_output)
@@ -160,11 +161,12 @@ def plot_gradcam(img_path, heatmap, title="Grad-CAM Heatmap"):
     heatmap = heatmap.resize(img.size, Image.LANCZOS)
     superimposed_img = Image.blend(img, heatmap, alpha=0.4)
     
-    plt.figure(figsize=(10, 10))
-    plt.imshow(superimposed_img)
-    plt.title(title)
-    plt.axis('off')
-    plt.show()
+    # Using explicit figure objects prevents memory leaks on cloud deployments
+    fig, ax = plt.subplots(figsize=(10, 10))
+    ax.imshow(superimposed_img)
+    ax.set_title(title)
+    ax.axis('off')
+    return fig
 
 # Sidebar
 st.sidebar.title("Dashboard")
@@ -249,12 +251,14 @@ elif app_mode == "Disease Recognition":
     if st.button("Show Image"):
         if test_image is not None:
             st.image(test_image, use_container_width=True)
+            
     # Predict Button
     if st.button("Predict"):
         if test_image is not None:
             with st.spinner("Please Wait.."):
                 st.write("Analyzing the image...")
                 result_index, model, input_arr = model_prediction(test_image)
+                
                 # Define Class
                 class_name = ['Anthracnose', 'Bacterial Canker', 'Cutting Weevil', 'Die Back', 'Gall Midge', 'Healthy', 'Powdery Mildew', 'Sooty Mould']
                 if class_name[result_index] == 'Healthy':
@@ -282,10 +286,11 @@ elif app_mode == "Disease Recognition":
                     temp_file.write(test_image.getvalue())
                     temp_file_path = temp_file.name
                 
-                # Generate and display heatmap
-                heatmap = make_gradcam_heatmap(input_arr, model, 'conv2d')
-                plot_gradcam(temp_file_path, heatmap, title="Grad-CAM Heatmap")
-                st.pyplot(plt)
+                # Generate and display heatmap (Passing the calculated result_index)
+                heatmap = make_gradcam_heatmap(input_arr, model, 'conv2d', pred_index=result_index)
+                fig = plot_gradcam(temp_file_path, heatmap, title="Grad-CAM Heatmap")
+                st.pyplot(fig)
+                
                 st.markdown("""
                 ### Heatmap Interpretation
                 The Grad-CAM heatmap highlights the regions of the image that are most important for the model's prediction. The areas with the highest intensity (red regions) indicate the parts of the image that contributed most to the model's decision. In the context of mango leaf disease classification, these regions likely correspond to the diseased areas of the leaf.
