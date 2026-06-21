@@ -122,13 +122,16 @@ def model_prediction(test_image):
 
 # Generate heatmap
 def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None):
+    # Safely convert incoming numpy int types to python standard integers to prevent tensor slicing errors
+    if pred_index is not None:
+        pred_index = int(pred_index)
+
     grad_model = tf.keras.models.Model(
         [model.inputs], [model.get_layer(last_conv_layer_name).output, model.output]
     )
     with tf.GradientTape() as tape:
         last_conv_layer_output, preds = grad_model(img_array)
         if pred_index is None:
-            # Force conversion to Python int to prevent TypeError slice errors in newer Keras versions
             pred_index = int(tf.argmax(preds[0]))
         class_channel = preds[:, pred_index]
 
