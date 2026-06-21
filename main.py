@@ -125,12 +125,14 @@ def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None
     # Safely convert incoming numpy int types to python standard integers to prevent tensor slicing errors
     if pred_index is not None:
         pred_index = int(pred_index)
-
+    model_output = model.outputs[0] if isinstance(model.outputs, (list, tuple)) else model.output
     grad_model = tf.keras.models.Model(
-        [model.inputs], [model.get_layer(last_conv_layer_name).output, model.output]
+        [model.inputs], [model.get_layer(last_conv_layer_name).output, model_output]
     )
     with tf.GradientTape() as tape:
         last_conv_layer_output, preds = grad_model(img_array)
+        if isinstance(preds, (list, tuple)):
+            preds = preds[0]
         if pred_index is None:
             pred_index = int(tf.argmax(preds[0]))
         class_channel = preds[:, pred_index]
@@ -155,7 +157,6 @@ def display_gradcam(img_path, heatmap, cam_path="cam.jpg", alpha=0.4):
     superimposed_img = heatmap * alpha + img
     cv2.imwrite(cam_path, superimposed_img)
     return cam_path
-
 def plot_gradcam(img_path, heatmap, title="Grad-CAM Heatmap"):
     img = Image.open(img_path)
     heatmap = np.uint8(255 * heatmap)
